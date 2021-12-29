@@ -14,10 +14,11 @@ class PathSyncer:
     路径同步器，路径可以是文件和目录
     """
 
-    def __init__(self, sour_path, dest_path, sync_paths=None, ignore_paths=None):
+    def __init__(self, sour_path, dest_path, del_non_sync, sync_paths=None, ignore_paths=None):
         """
         :param sour_path: 需要同步的源路径
         :param dest_path: 需要同步的目标路径
+        :param del_non_sync: 是否删除不需要同步的文件
         :param sync_paths: 可以指定只同步指定路径，如果不输入则同步所有路径，参数为路径的数组
         :param ignore_paths: 可以指定同步时忽略的路径，参数为路径的数组
         """
@@ -28,6 +29,7 @@ class PathSyncer:
 
         self.sour_path = os.path.normpath(sour_path)
         self.dest_path = os.path.normpath(dest_path)
+        self.del_non_sync = del_non_sync
 
         if sync_paths is not None:
             for i in range(0, len(sync_paths)):
@@ -50,12 +52,15 @@ class PathSyncer:
             self._sync_file(self.sour_path, self.dest_path)
 
     def _sync_file(self, sour, dest):
-        if self._is_sync_file(sour):
+        is_file = os.path.isfile(sour)
+        is_sync = self._is_sync_path(os.path.relpath(sour, self.sour_path))
+
+        if is_file and is_sync:
             print(sour + ' -> ' + dest)
             if os.path.isdir(dest):
                 shutil.rmtree(dest)
             shutil.copy(sour, dest)
-        else:
+        elif (is_sync and not is_file) or (not is_sync and self.del_non_sync):
             print('del ' + dest)
             remove_path(dest)
 
@@ -75,8 +80,9 @@ class PathSyncer:
             sour_path = os.path.join(sour, p)
             dest_path = os.path.join(dest, p)
 
-            if not self._is_sync_path(sour_path):
-                remove_path(dest_path)
+            if not self._is_sync_path(os.path.relpath(sour_path, self.sour_path)):
+                if self.del_non_sync:
+                    remove_path(dest_path)
                 continue
 
             if os.path.isfile(sour_path):
@@ -90,19 +96,14 @@ class PathSyncer:
             for p in os.listdir(dest):
                 sour_path = os.path.join(sour, p)
                 dest_path = os.path.join(dest, p)
-                if os.path.exists(dest_path) and (not self._is_sync_path(sour_path)):
+
+                is_sync = self._is_sync_path(os.path.relpath(sour_path, self.sour_path))
+                if (is_sync and not os.path.exists(sour_path)) \
+                        or (not is_sync and self.del_non_sync):
                     print('del ' + dest_path)
                     remove_path(dest_path)
 
-    def _is_sync_dir(self, path):
-        return os.path.isdir(path) and self._is_sync_path(path)
-
-    def _is_sync_file(self, path):
-        return os.path.isfile(path) and self._is_sync_path(path)
-
-    def _is_sync_path(self, path):
-        rel_path = os.path.relpath(path, self.sour_path)
-
+    def _is_sync_path(self, rel_path):
         can_sync = True
         if self.sync_paths is not None:
             can_sync = False
@@ -119,6 +120,3 @@ class PathSyncer:
                 if rel_path.startswith(p):
                     return False
         return True
-
-
-
