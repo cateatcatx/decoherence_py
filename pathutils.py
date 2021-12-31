@@ -50,7 +50,7 @@ class PathSyncer:
             self._sync_file(self.sour_path, self.dest_path)
 
     def _sync_file(self, sour, dest):
-        if os.path.isfile(sour) and self._is_sync_path(os.path.relpath(sour, self.sour_path)):
+        if os.path.isfile(sour) and self._is_sync_path(os.path.relpath(sour, self.sour_path), False):
             print(sour + ' -> ' + dest)
             if os.path.isdir(dest):
                 shutil.rmtree(dest)
@@ -72,21 +72,18 @@ class PathSyncer:
             sour_path = os.path.join(sour, p)
             dest_path = os.path.join(dest, p)
 
-            if not self._is_sync_path(os.path.relpath(sour_path, self.sour_path)):
-                continue
-
-            if os.path.isfile(sour_path):
+            if os.path.isfile(sour_path) and self._is_sync_path(os.path.relpath(sour_path, self.sour_path), False):
                 print(sour_path + ' -> ' + dest_path)
                 shutil.copy(sour_path, dest_path)
-            elif os.path.isdir(sour_path):
+            elif os.path.isdir(sour_path) and self._is_sync_path(os.path.relpath(sour_path, self.sour_path), True):
                 self._sync_dir(sour_path, dest_path)
 
-    def _is_sync_path(self, rel_path):
+    def _is_sync_path(self, rel_path, is_dir):
         can_sync = True
         if self.sync_paths is not None:
             can_sync = False
             for p in self.sync_paths:
-                if rel_path.startswith(p):
+                if (is_dir and p.startswith(rel_path)) or rel_path.startswith(p):
                     can_sync = True
                     break
 
@@ -95,6 +92,6 @@ class PathSyncer:
 
         if self.ignore_paths is not None:
             for p in self.ignore_paths:
-                if rel_path.startswith(p):
+                if (is_dir and p.startswith(rel_path)) and rel_path.startswith(p):
                     return False
         return True
